@@ -8,6 +8,7 @@ using RestSharp;
 using Rock;
 using Rock.Attribute;
 using Rock.Data;
+using Rock.Jobs;
 using Rock.Model;
 using Rock.Web.Cache;
 
@@ -22,7 +23,7 @@ namespace com.bemaservices.SurveyGizmo
     [IntegerField( "Days Back", "How many days to go back and search for surveys", true, 2, "", 4 )]
 
     [DisallowConcurrentExecution]
-    public class SyncSurveyResults : IJob
+    public class SyncSurveyResults : RockJob
     {
         private static RestClient _client;
         private static RestRequest _request;
@@ -45,14 +46,13 @@ namespace com.bemaservices.SurveyGizmo
         /// <see cref="ITrigger" /> fires that is associated with
         /// the <see cref="IJob" />.
         /// </summary>
-        public virtual void Execute( IJobExecutionContext context )
+        public override void Execute()
         {
-            JobDataMap dataMap = context.JobDetail.JobDataMap;
-            int daysBack = dataMap.GetString( "DaysBack" ).AsIntegerOrNull() ?? 1;
-            string apiToken = dataMap.GetString( "APIToken" );
-            string apiTokenSecret = dataMap.GetString( "APITokenSecret" );
-            string apiBaseUrl = dataMap.GetString( "APIBaseURL" ).TrimEnd( new[] { '/' } );
-            int requestsPerMinute = dataMap.GetString( "APIRequestsPerMinute" ).AsIntegerOrNull() ?? 30;
+            int daysBack = GetAttributeValue( "DaysBack" ).AsIntegerOrNull() ?? 1;
+            string apiToken = GetAttributeValue( "APIToken" );
+            string apiTokenSecret = GetAttributeValue( "APITokenSecret" );
+            string apiBaseUrl = GetAttributeValue( "APIBaseURL" ).TrimEnd( new[] { '/' } );
+            int requestsPerMinute = GetAttributeValue( "APIRequestsPerMinute" ).AsIntegerOrNull() ?? 30;
             DateTime requestPerMinuteTime = RockDateTime.Now;
 
             if ( apiToken.IsNotNullOrWhiteSpace() && apiTokenSecret.IsNotNullOrWhiteSpace() && apiBaseUrl.IsNotNullOrWhiteSpace() )
@@ -65,7 +65,7 @@ namespace com.bemaservices.SurveyGizmo
 
                     if ( !dvSurveys.Any() )
                     {
-                        context.Result = "No surveys to sync";
+                        this.Result = "No surveys to sync";
                     }
                     else
                     {
@@ -109,8 +109,8 @@ namespace com.bemaservices.SurveyGizmo
 
                                     // Get list of surveys Responsees
                                     _request = new RestRequest( "/survey/" + surveyId.Value.ToString() + "/surveyresponse", Method.GET );
-                                    _request.AddQueryParameter( "api_token", dataMap.GetString( "APIToken" ) );
-                                    _request.AddQueryParameter( "api_token_secret", dataMap.GetString( "APITokenSecret" ) );
+                                    _request.AddQueryParameter( "api_token", GetAttributeValue( "APIToken" ) );
+                                    _request.AddQueryParameter( "api_token_secret", GetAttributeValue( "APITokenSecret" ) );
                                     _request.AddQueryParameter( "page", currentPage.ToString() );
                                     _request.AddQueryParameter( "resultsperpage", "30" );
 
@@ -214,7 +214,7 @@ namespace com.bemaservices.SurveyGizmo
                                                 }
 
                                                 surveysProcessed++;
-                                                context.UpdateLastStatusMessage( "Survey responses processed: " + surveysProcessed.ToString() );
+                                                this.UpdateLastStatusMessage( "Survey responses processed: " + surveysProcessed.ToString() );
                                             }
                                         }
                                         else
@@ -228,11 +228,11 @@ namespace com.bemaservices.SurveyGizmo
                                     }
                                 }
 
-                                context.UpdateLastStatusMessage( "Total surveys processed: " + surveysProcessed.ToString() );
+                                this.UpdateLastStatusMessage( "Total surveys processed: " + surveysProcessed.ToString() );
                             }
                             else
                             {
-                                context.UpdateLastStatusMessage( "Survey could not be synced. Survey: " + surveyId.Value );
+                                this.UpdateLastStatusMessage( "Survey could not be synced. Survey: " + surveyId.Value );
                             }
                         }
                     }
@@ -240,7 +240,7 @@ namespace com.bemaservices.SurveyGizmo
             }
             else
             {
-                context.UpdateLastStatusMessage( "API key is not configured properly." );
+                this.UpdateLastStatusMessage( "API key is not configured properly." );
             }
         }
     }
